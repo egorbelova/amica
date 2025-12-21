@@ -1,0 +1,16 @@
+{
+  "name": "Chillin`",
+  "short_name": "Chillin`",
+  "description": "Messenger for chatting with friends",
+  "start_url": "/",
+  "display": "standalone",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/Images/icon_manifest.jpeg",
+      "sizes": "72x72",
+      "purpose": "any maskable",
+      "density": "1.0"
+    }
+  ]
+}

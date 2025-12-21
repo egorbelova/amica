@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # web:
+  #   build: .
+  #   container_name: django_app
+  #   ports:
+  #     - '8000:8000'
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379
+  #   depends_on:
+  #     - redis
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    container_name: celery_worker
+    volumes:
+      - ./media:/app/media
+      - .:/app
+    command: celery -A Chat worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  redis_data:

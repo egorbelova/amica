@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <link rel="stylesheet" href="{% static 'CSS/user_form.css' %}" />
+    <link rel="stylesheet" href="{% static 'CSS/room.css' %}" />
+    <link rel="manifest" href="{% static 'manifest.json' %}" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta content="true" name="HandheldFriendly" />
+    <meta content="width" name="MobileOptimized" />
+    <meta content="yes" name="apple-mobile-web-app-capable" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, shrink-to-fit=no"
+    />
+    <link
+      rel="shortcut icon"
+      href="{% static 'Images/main_site_icon.png' %}"
+      type="image/png"
+    />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <title>Chillin`</title>
+    <style>
+      .auth-state {
+        display: none;
+      }
+      .authenticated {
+        background: #f5f5f5;
+      }
+      .unauthenticated {
+        background: white;
+      }
+    </style>
+  </head>
+  <body
+    class="{% if user.is_authenticated %}authenticated{% else %}unauthenticated{% endif %}"
+  >
+    <!-- Login State -->
+    <div
+      id="login-state"
+      class="auth-state {% if not user.is_authenticated %}active{% endif %}"
+    >
+      {% include 'pages/login_form.html' %}
+    </div>
+
+    <!-- App State -->
+    <div
+      id="app-state"
+      class="auth-state {% if user.is_authenticated %}active{% endif %}"
+    >
+      {% if user.is_authenticated %} {% include 'room.html' %} {% endif %}
+    </div>
+
+    <script>
+      // Show appropriate state based on authentication
+      document.addEventListener('DOMContentLoaded', function() {
+          const loginState = document.getElementById('login-state');
+          const appState = document.getElementById('app-state');
+
+          {% if user.is_authenticated %}
+              loginState.style.display = 'none';
+              appState.style.display = 'block';
+          {% else %}
+              loginState.style.display = 'block';
+              appState.style.display = 'none';
+          {% endif %}
+      });
+    </script>
+  </body>
+</html>
