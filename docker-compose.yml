@@ -23,11 +23,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.celery
-    container_name: celery_worker
+    tmpfs:
+     - /tmp:size=1g
     volumes:
-      - ./media:/app/media
       - .:/app
-    command: celery -A Chat worker --loglevel=info
+      - ./media:/app/media
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0

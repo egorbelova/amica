@@ -1,0 +1,193 @@
+from rest_framework import serializers
+
+from ..models import *
+
+
+class DisplayPhotoSerializer(serializers.ModelSerializer):
+    small = serializers.SerializerMethodField()
+    medium = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DisplayPhoto
+        fields = [
+            "id",
+            "type",
+            "small",
+            "medium",
+            "is_active",
+            "is_primary",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_small(self, obj):
+        return self._build_url(obj.image_thumbnail_small)
+
+    def get_medium(self, obj):
+        return self._build_url(obj.image_thumbnail_medium)
+
+    def get_type(self, obj):
+        return "photo"
+
+    def _build_url(self, field):
+        if not field:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(field.url) if request else field.url
+
+
+class DisplayVideoSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DisplayVideo
+        fields = [
+            "id",
+            "type",
+            "url",
+            "duration",
+            "is_active",
+            "is_primary",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_url(self, obj):
+        if not obj.video:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.video.url) if request else obj.video.url
+
+    def get_type(self, obj):
+        return "video"
+
+
+class DisplayMediaCreateSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    is_primary = serializers.BooleanField(default=False, write_only=True)
+    is_active = serializers.BooleanField(default=True)
+
+    def create(self, validated_data):
+        obj = self.context["object"]
+        is_primary = validated_data.pop("is_primary", False)
+        file = validated_data.pop("file")
+
+        ext = file.name.split(".")[-1].lower()
+        if ext in ["jpg", "jpeg", "png", "webp", "gif"]:
+            media = DisplayPhoto.objects.create(
+                content_object=obj, image=file, **validated_data
+            )
+        elif ext in ["mp4", "mov", "webm"]:
+            media = DisplayVideo.objects.create(
+                content_object=obj, video=file, **validated_data
+            )
+        else:
+            raise serializers.ValidationError("Unsupported file type")
+
+        if is_primary:
+            media.is_primary = True
+            media.save()
+
+        return media
+
+
+class DisplayMediaSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        instance = instance.concrete()
+
+        if isinstance(instance, DisplayPhoto):
+            return DisplayPhotoSerializer(instance, context=self.context).data
+
+        if isinstance(instance, DisplayVideo):
+            return DisplayVideoSerializer(instance, context=self.context).data
+
+        return {}
+
+
+class FileSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = File
+        fields = [
+            "id",
+            "file_url",
+            "extension",
+            "category",
+            "original_name",
+            "file_size",
+            "uploaded_at",
+        ]
+        read_only_fields = fields
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if obj.file:
+            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+        return None
+
+
+class ImageFileSerializer(FileSerializer):
+    thumbnail_small_url = serializers.SerializerMethodField()
+    thumbnail_medium_url = serializers.SerializerMethodField()
+    width = serializers.SerializerMethodField()
+    height = serializers.SerializerMethodField()
+    dominant_color = serializers.SerializerMethodField()
+
+    class Meta(FileSerializer.Meta):
+        fields = FileSerializer.Meta.fields + [
+            "thumbnail_small_url",
+            "thumbnail_medium_url",
+            "width",
+            "height",
+            "dominant_color",
+        ]
+
+    def get_thumbnail_small_url(self, obj):
+        if getattr(obj, "thumbnail_small", None):
+            request = self.context.get("request")
+            return (
+                request.build_absolute_uri(obj.thumbnail_small.url)
+                if request
+                else obj.thumbnail_small.url
+            )
+        return None
+
+    def get_thumbnail_medium_url(self, obj):
+        if getattr(obj, "thumbnail_medium", None):
+            request = self.context.get("request")
+            return (
+                request.build_absolute_uri(obj.thumbnail_medium.url)
+                if request
+                else obj.thumbnail_medium.url
+            )
+        return None
+
+    def get_width(self, obj):
+        return getattr(obj, "width", None)
+
+    def get_height(self, obj):
+        return getattr(obj, "height", None)
+
+    def get_dominant_color(self, obj):
+        return getattr(obj, "dominant_color", None)
+
+
+class VideoFileSerializer(FileSerializer):
+    width = serializers.SerializerMethodField()
+    height = serializers.SerializerMethodField()
+    # duration = serializers.SerializerMethodField()
+
+    class Meta(FileSerializer.Meta):
+        fields = FileSerializer.Meta.fields + ["width", "height"]
+
+    def get_width(self, obj):
+        return getattr(obj, "width", None)
+
+    def get_height(self, obj):
+        return getattr(obj, "height", None)
+
+    # def get_duration(self, obj):
+    #     return getattr(obj, 'duration', None)

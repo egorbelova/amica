@@ -1,0 +1,99 @@
+import logging
+
+from django.contrib.auth import get_user_model
+from django.db.models.signals import m2m_changed, post_save
+from django.dispatch import receiver
+
+from apps.media_files.models.models import DisplayVideo, VideoFile
+
+from .models import Chat, Message, MessageRecipient
+from .tasks import compress_video_task
+
+
+@receiver(post_save, sender=Message)
+def create_message_recipients(sender, instance, created, **kwargs):
+    if created:
+        chat_users = instance.chat.users.all()
+        recipients = [
+            MessageRecipient(message=instance, user=user) for user in chat_users
+        ]
+        MessageRecipient.objects.bulk_create(recipients)
+
+
+User = get_user_model()
+
+
+@receiver(m2m_changed, sender=Chat.users.through)
+def add_existing_messages_to_new_user(sender, instance, action, pk_set, **kwargs):
+    if action != "post_add":
+        return
+
+    new_users = list(User.objects.filter(pk__in=pk_set).only("id"))
+    if not new_users:
+        return
+
+    message_ids = list(instance.messages.values_list("id", flat=True))
+
+    if not message_ids:
+        return
+
+    existing_links = set(
+        MessageRecipient.objects.filter(
+            user_id__in=pk_set,
+            message_id__in=message_ids,
+        ).values_list("message_id", "user_id")
+    )
+
+    recipients_to_create = []
+
+    for user in new_users:
+        for message_id in message_ids:
+            link = (message_id, user.id)
+            if link not in existing_links:
+                recipients_to_create.append(
+                    MessageRecipient(message_id=message_id, user_id=user.id)
+                )
+
+    if recipients_to_create:
+        MessageRecipient.objects.bulk_create(recipients_to_create, batch_size=500)
+
+
+@receiver(m2m_changed, sender=Chat.users.through)
+def remove_recipients_when_user_leaves_chat(sender, instance, action, pk_set, **kwargs):
+    if action != "post_remove":
+        return
+
+    user_ids = list(pk_set)
+
+    MessageRecipient.objects.filter(
+        user_id__in=user_ids, message__chat=instance
+    ).delete()
+
+    print(
+        f"[INFO] Removed MessageRecipient for users={user_ids} from chat={instance.id}"
+    )
+
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=DisplayVideo)
+def profile_video_post_save(sender, instance, created, **kwargs):
+    if created and instance.video and instance.video.name:
+        try:
+            compress_video_task.delay("DisplayVideo", instance.pk)
+            logger.info(f"Scheduled compression for video {instance.pk}")
+        except Exception as e:
+            logger.error(f"Failed to schedule compression for video {instance.pk}: {e}")
+
+
+@receiver(post_save, sender=VideoFile)
+def video_file_post_save(sender, instance, created, **kwargs):
+    if created and instance.file and instance.file.name:
+        try:
+            compress_video_task.delay("VideoFile", instance.pk)
+            logger.info(f"Scheduled compression for VideoFile {instance.pk}")
+        except Exception as e:
+            logger.error(
+                f"Failed to schedule compression for VideoFile {instance.pk}: {e}"
+            )

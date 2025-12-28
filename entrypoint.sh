@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-export DJANGO_SETTINGS_MODULE=Chat.settings
+export DJANGO_SETTINGS_MODULE=amica.settings
 
 python manage.py makemigrations --noinput
 python manage.py migrate --noinput
@@ -11,4 +11,4 @@ User.objects.filter(email='admin@gmail.com').exists() or User.objects.create_sup
 
 python manage.py collectstatic --no-input
 
-exec daphne Chat.asgi:application -b 0.0.0.0 -p 8000
+exec daphne amica.asgi:application -b 0.0.0.0 -p 8000
