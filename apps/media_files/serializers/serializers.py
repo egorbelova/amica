@@ -125,8 +125,16 @@ class FileSerializer(serializers.ModelSerializer):
     def get_file_url(self, obj):
         request = self.context.get("request")
         if obj.file:
-            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+            if request:
+                return request.build_absolute_uri(
+                    reverse("protected-file", args=[obj.id])
+                )
+            else:
+                return reverse("protected-file", args=[obj.id])
         return None
+
+
+from django.urls import reverse
 
 
 class ImageFileSerializer(FileSerializer):
@@ -148,21 +156,23 @@ class ImageFileSerializer(FileSerializer):
     def get_thumbnail_small_url(self, obj):
         if getattr(obj, "thumbnail_small", None):
             request = self.context.get("request")
-            return (
-                request.build_absolute_uri(obj.thumbnail_small.url)
-                if request
-                else obj.thumbnail_small.url
-            )
+            if request:
+                return request.build_absolute_uri(
+                    reverse("protected-file", args=[obj.id, "thumbnail_small"])
+                )
+            else:
+                return reverse("protected-file", args=[obj.id, "thumbnail_small"])
         return None
 
     def get_thumbnail_medium_url(self, obj):
         if getattr(obj, "thumbnail_medium", None):
             request = self.context.get("request")
-            return (
-                request.build_absolute_uri(obj.thumbnail_medium.url)
-                if request
-                else obj.thumbnail_medium.url
-            )
+            if request:
+                return request.build_absolute_uri(
+                    reverse("protected-file", args=[obj.id, "thumbnail_medium"])
+                )
+            else:
+                return reverse("protected-file", args=[obj.id, "thumbnail_medium"])
         return None
 
     def get_width(self, obj):

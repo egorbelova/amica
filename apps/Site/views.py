@@ -1,10 +1,12 @@
 import logging
+import os
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -99,6 +101,44 @@ class MessageReactionView(APIView):
                 {"error": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+protected_storage = FileSystemStorage(location=settings.PROTECTED_MEDIA_ROOT)
+
+from apps.media_files.models.models import File
+
+
+class ProtectedFileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, file_id, version=None, format=None):
+        try:
+            file_obj = File.objects.get(id=file_id)
+        except File.DoesNotExist:
+            raise Http404("File not found")
+
+        if not file_obj.messages.filter(chat__users=request.user).exists():
+            return Response({"detail": "Forbidden"}, status=403)
+
+        if isinstance(file_obj, ImageFile) and version in [
+            "thumbnail_small",
+            "thumbnail_medium",
+        ]:
+            file_field = getattr(file_obj, version)
+            if not file_field:
+                raise Http404("Thumbnail not found")
+            file_path = os.path.join(settings.PROTECTED_MEDIA_ROOT, file_field.name)
+        else:
+            file_path = os.path.join(settings.PROTECTED_MEDIA_ROOT, file_obj.file.name)
+
+        if not os.path.exists(file_path):
+            raise Http404("File not found")
+
+        return FileResponse(
+            open(file_path, "rb"),
+            as_attachment=False,
+            filename=os.path.basename(file_path),
+        )
 
 
 class GetMessagesAPIView(APIView):
@@ -199,9 +239,9 @@ class MessageViewSet(viewsets.ViewSet):
                         if uploaded_file.size > MAX_FILE_SIZE:
                             continue
 
-                        fss = FileSystemStorage()
-                        filename = fss.save(uploaded_file.name, uploaded_file)
-
+                        filename = protected_storage.save(
+                            uploaded_file.name, uploaded_file
+                        )
                         from mimetypes import guess_type
 
                         mime_type, _ = guess_type(uploaded_file.name)
@@ -411,17 +451,19 @@ class UserEmailSearchView(APIView):
             )
 
         users = User.objects.filter(
-            Q(email__icontains=query) | Q(username__icontains=query)
+            Q(email__istartswith=query) | Q(username__istartswith=query)
         )[:20]
 
-        results = [
-            {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username,
-                "display_name": user.display_name,
-            }
-            for user in users
-        ]
+        serializer = UserSerializer(users, many=True, context={"request": request})
 
-        return Response(results, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def protected_file(request, filename):
+    filepath = os.path.join(settings.PROTECTED_MEDIA_ROOT, filename)
+    if not os.path.exists(filepath):
+        raise Http404("File not found")
+
+    return FileResponse(open(filepath, "rb"))

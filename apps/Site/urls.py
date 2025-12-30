@@ -18,6 +18,14 @@ urlpatterns = [
     path(
         "users/search/", views.UserEmailSearchView.as_view(), name="user-email-search"
     ),
+    path(
+        "files/<int:file_id>/", views.ProtectedFileView.as_view(), name="protected-file"
+    ),
+    path(
+        "protected-file/<int:file_id>/<str:version>/",
+        views.ProtectedFileView.as_view(),
+        name="protected-file",
+    ),
 ]
 
 urlpatterns += router.urls

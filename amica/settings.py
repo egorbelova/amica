@@ -257,3 +257,5 @@ SIMPLE_JWT = {
 # EMAIL_HOST_USER = "your_email@gmail.com"
 # EMAIL_HOST_PASSWORD = "your_email_password"
 # DEFAULT_FROM_EMAIL = "Your App <your_email@gmail.com>"
+
+PROTECTED_MEDIA_ROOT = BASE_DIR / "protected_files"

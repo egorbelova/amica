@@ -153,8 +153,16 @@ class DisplayVideo(DisplayMedia):
         ordering = ["-created_at"]
 
 
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+
+protected_storage = FileSystemStorage(location=settings.PROTECTED_MEDIA_ROOT)
+
+
 class File(PolymorphicModel):
-    file = models.FileField(max_length=255, null=True, blank=True)
+    file = models.FileField(
+        max_length=255, null=True, blank=True, storage=protected_storage
+    )
     name = models.CharField(max_length=255, blank=True, null=True)
     original_name = models.CharField(max_length=255, blank=True, null=True)
     extension = models.CharField(max_length=10, blank=True, null=True)
@@ -209,10 +217,18 @@ class ImageFile(File):
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
     thumbnail_small = models.ImageField(
-        max_length=255, blank=True, null=True, upload_to="thumbnails/small/"
+        max_length=255,
+        blank=True,
+        null=True,
+        upload_to="thumbnails/small/",
+        storage=protected_storage,
     )
     thumbnail_medium = models.ImageField(
-        max_length=255, blank=True, null=True, upload_to="thumbnails/medium/"
+        max_length=255,
+        blank=True,
+        null=True,
+        upload_to="thumbnails/medium/",
+        storage=protected_storage,
     )
     dominant_color = models.CharField(max_length=7, blank=True, null=True)
 
@@ -288,6 +304,7 @@ class VideoFile(File):
 
         if self.file and (self.width is None or self.height is None):
             try:
+                file_path = self.file.storage.path(self.file.name)
                 cmd = [
                     "ffprobe",
                     "-v",
@@ -298,7 +315,7 @@ class VideoFile(File):
                     "stream=width,height",
                     "-of",
                     "csv=s=x:p=0",
-                    self.file.path,
+                    file_path,
                 ]
                 output = subprocess.check_output(cmd).decode().strip()
                 w, h = map(int, output.split("x"))

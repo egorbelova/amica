@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 
 from apps.accounts.serializers.serializers import UserSerializer
@@ -48,18 +49,14 @@ class MessageSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         serialized_files = []
         for f in obj.file.all():
-            print(f.__class__.__name__, f.id, getattr(f, "width", None))
             if isinstance(f, ImageFile):
                 serializer = ImageFileSerializer(f, context={"request": request})
             elif isinstance(f, VideoFile):
                 serializer = VideoFileSerializer(f, context={"request": request})
-            # elif isinstance(f, AudioFile):
-            #     serializer = AudioFileSerializer(f, context={'request': request})
             else:
                 serializer = FileSerializer(f, context={"request": request})
 
             serialized_files.append(serializer.data)
-
         return serialized_files
 
     def get_view_count(self, obj):
