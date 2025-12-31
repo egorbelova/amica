@@ -71,13 +71,13 @@ class DisplayMediaCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         obj = self.context["object"]
-        is_primary = validated_data.pop("is_primary", False)
+        is_primary = validated_data.pop("is_primary", True)
         file = validated_data.pop("file")
 
         ext = file.name.split(".")[-1].lower()
         if ext in ["jpg", "jpeg", "png", "webp", "gif"]:
             media = DisplayPhoto.objects.create(
-                content_object=obj, image=file, **validated_data
+                content_object=obj, image=file, is_primary=True, **validated_data
             )
         elif ext in ["mp4", "mov", "webm"]:
             media = DisplayVideo.objects.create(

@@ -12,6 +12,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = (
+            "id",
             "last_seen",
             "bio",
             "phone",

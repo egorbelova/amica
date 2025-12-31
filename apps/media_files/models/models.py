@@ -85,12 +85,17 @@ class DisplayMedia(models.Model):
         ordering = ["-created_at"]
 
     def save(self, *args, **kwargs):
-        ensure_primary_if_needed(self)
+        is_new = self.pk is None
+
+        super().save(*args, **kwargs)  # <-- сначала сохраняем
+
+        if is_new:
+            ensure_primary_if_needed(self)
 
         if self.is_primary:
             set_primary(self)
 
-        super().save(*args, **kwargs)
+        super().save(update_fields=["is_primary"])
 
     def concrete(self):
         if hasattr(self, "displayphoto"):

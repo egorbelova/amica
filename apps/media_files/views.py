@@ -4,10 +4,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import DisplayPhoto, DisplayVideo
-from .serializers import DisplayMediaCreateSerializer, DisplayMediaSerializer
+from .serializers.serializers import DisplayMediaCreateSerializer, DisplayMediaSerializer
+from rest_framework.permissions import IsAuthenticated
 
 
 class DisplayMediaViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     def get_object_instance(self):
         content_type = self.request.query_params.get("content_type")
         object_id = self.request.query_params.get("object_id")
@@ -34,6 +36,7 @@ class DisplayMediaViewSet(viewsets.ViewSet):
 
     def create(self, request, *args, **kwargs):
         obj = self.get_object_instance()
+        print(obj)
         if not obj:
             return Response({"detail": "Missing content_type or object_id"}, status=400)
 

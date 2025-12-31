@@ -12,6 +12,7 @@ urlpatterns = [
     ),
     path("api/", include("apps.Site.urls")),
     path("api/", include("apps.accounts.urls")),
+    path("api/media_files/", include("apps.media_files.urls")),
 ]
 
 if settings.DEBUG:
