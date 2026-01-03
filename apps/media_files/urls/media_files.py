@@ -1,4 +1,5 @@
 from rest_framework.routers import DefaultRouter
+
 from apps.media_files.views import DisplayMediaViewSet
 
 router = DefaultRouter()

@@ -2,6 +2,7 @@
 .idea
 venv
 media
+protected_files
 db.json
 __pycache__/
 *.pyc

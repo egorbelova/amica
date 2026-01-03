@@ -66,6 +66,7 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = (
         (None, {"fields": ("username", "email", "password")}),
         ("Passkey", {"fields": readonly_fields}),
+        ("Session", {"fields": ("preferred_session_lifetime_days",)}),
         ("Permissions", {"fields": ("is_staff", "is_active")}),
     )
 
@@ -81,6 +82,7 @@ class CustomUserAdmin(UserAdmin):
                     "password2",
                     "is_staff",
                     "is_active",
+                    "preferred_session_lifetime_days",
                 ),
             },
         ),

@@ -9,6 +9,19 @@ from django.utils.translation import gettext_lazy as _
 from ..managers import CustomUserManager
 
 
+class SessionLifetime(models.IntegerChoices):
+    FIVE_SECONDS = 500, _("5 seconds")
+    TEN_SECONDS = 1000, _("10 seconds")
+    THIRTY_SECONDS = 3000, _("30 seconds")
+    ONE_MINUTE = 6000, _("1 minute")
+    ONE_WEEK = 7, _("1 week")
+    TWO_WEEKS = 14, _("2 weeks")
+    ONE_MONTH = 30, _("1 month")
+    TWO_MONTHS = 60, _("2 months")
+    THREE_MONTHS = 90, _("3 months")
+    SIX_MONTHS = 180, _("6 months")
+
+
 class CustomUser(AbstractUser):
     email = models.EmailField(_("email address"), unique=True)
     username = models.CharField(max_length=64, unique=False, blank=True, null=True)
@@ -18,6 +31,10 @@ class CustomUser(AbstractUser):
     credential_signature = models.BinaryField(null=True, blank=True)
     credential_user_handle = models.BinaryField(null=True, blank=True)
     sign_count = models.BigIntegerField(default=0)
+
+    preferred_session_lifetime_days = models.PositiveIntegerField(
+        choices=SessionLifetime.choices, default=SessionLifetime.ONE_WEEK
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

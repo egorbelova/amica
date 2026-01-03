@@ -42,7 +42,13 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ("id", "email", "username", "profile")
+        fields = (
+            "id",
+            "email",
+            "username",
+            "profile",
+            "preferred_session_lifetime_days",
+        )
         read_only_fields = fields
 
     def to_representation(self, instance):

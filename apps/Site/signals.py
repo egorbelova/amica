@@ -7,7 +7,7 @@ from django.dispatch import receiver
 from apps.media_files.models.models import DisplayVideo, VideoFile
 
 from .models import Chat, Message, MessageRecipient
-from .tasks import compress_video_task
+from .tasks.compress_video_task import compress_video_task
 
 
 @receiver(post_save, sender=Message)
@@ -87,13 +87,16 @@ def profile_video_post_save(sender, instance, created, **kwargs):
             logger.error(f"Failed to schedule compression for video {instance.pk}: {e}")
 
 
+from django.db import transaction
+
+
 @receiver(post_save, sender=VideoFile)
 def video_file_post_save(sender, instance, created, **kwargs):
-    if created and instance.file and instance.file.name:
-        try:
-            compress_video_task.delay("VideoFile", instance.pk)
-            logger.info(f"Scheduled compression for VideoFile {instance.pk}")
-        except Exception as e:
-            logger.error(
-                f"Failed to schedule compression for VideoFile {instance.pk}: {e}"
-            )
+    if not created or not instance.file:
+        return
+
+    def enqueue():
+        compress_video_task.delay("VideoFile", instance.pk)
+        logger.info(f"Scheduled compression for VideoFile {instance.pk}")
+
+    transaction.on_commit(enqueue)

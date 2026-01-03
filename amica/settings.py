@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     # "apps.chat",
     "apps.media_files",
     "webauthn",
+    "django_celery_beat",
+    "django_celery_results",
 ]
 
 
@@ -165,6 +167,22 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+from datetime import timedelta
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "flush_expired_sessions_daily": {
+        "task": "apps.Site.tasks.flush_expired_tokens.flush_expired_tokens_daily",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    "cleanup_blacklisted_tokens_daily": {
+        "task": "apps.Site.tasks.cleanup_blacklist.cleanup_expired_blacklisted_tokens",
+        "schedule": crontab(hour=3, minute=30),
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

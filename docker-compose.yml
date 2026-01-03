@@ -19,20 +19,37 @@ services:
     volumes:
       - redis_data:/data
 
-  celery:
+  celery-worker:
     build:
       context: .
       dockerfile: Dockerfile.celery
     tmpfs:
-     - /tmp:size=1g
+      - /tmp:size=1g
     volumes:
       - .:/app
       - ./media:/app/media
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    command: celery -A amica worker --loglevel=info
     depends_on:
       - redis
-
+  
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    tmpfs:
+      - /tmp:size=1g
+    volumes:
+      - .:/app
+      - ./media:/app/media
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    command: celery -A amica beat --loglevel=info
+    depends_on:
+      - redis
+  
 volumes:
   redis_data:

@@ -1,12 +1,13 @@
 import base64
 import json
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -20,6 +21,8 @@ from webauthn import (generate_authentication_options,
                       verify_authentication_response,
                       verify_registration_response)
 
+from apps.Site.tasks.flush_expired_tokens import flush_expired_token
+
 from .models import ActiveSession
 from .serializers.serializers import ActiveSessionSerializer, UserSerializer
 from .utils.google_login_or_create_user import google_login_or_create_user
@@ -27,32 +30,68 @@ from .utils.google_login_or_create_user import google_login_or_create_user
 User = get_user_model()
 
 
-def remember_session(user, refresh, request):
-    refresh_jti = str(refresh["jti"])
-    expires_at = datetime.fromtimestamp(refresh["exp"], tz=timezone.utc)
+def create_refresh_token(user, session_lifetime_days):
+    token = RefreshToken.for_user(user)
+    token.set_exp(
+        from_time=timezone.now(), lifetime=timedelta(days=session_lifetime_days)
+    )
+    return token
 
-    ActiveSession.objects.update_or_create(
+
+def remember_session(user, refresh, request, old_jti=None):
+    refresh_jti = str(refresh["jti"])
+    lifetime_days = getattr(user, "preferred_session_lifetime_days", 7)
+
+    if (
+        lifetime_days == 500
+        or lifetime_days == 1000
+        or lifetime_days == 3000
+        or lifetime_days == 6000
+    ):
+        expires_at = timezone.now() + timedelta(seconds=lifetime_days / 100)
+    else:
+        expires_at = timezone.now() + timedelta(days=lifetime_days)
+
+    if old_jti:
+        session = ActiveSession.objects.filter(jti=old_jti).first()
+        if session:
+            session.jti = refresh_jti
+            session.refresh_token = str(refresh)
+            session.expires_at = expires_at
+            session.ip_address = request.META.get("REMOTE_ADDR")
+            session.user_agent = request.META.get("HTTP_USER_AGENT")
+            session.save()
+            flush_expired_token.apply_async(args=[session.id], eta=expires_at)
+            return session
+
+    session = ActiveSession.objects.create(
+        user=user,
         jti=refresh_jti,
-        defaults={
-            "user": user,
-            "refresh_token": str(refresh),
-            "ip_address": request.META.get("REMOTE_ADDR"),
-            "user_agent": request.META.get("HTTP_USER_AGENT"),
-            "expires_at": expires_at,
-        },
+        refresh_token=str(refresh),
+        ip_address=request.META.get("REMOTE_ADDR"),
+        user_agent=request.META.get("HTTP_USER_AGENT"),
+        expires_at=expires_at,
     )
 
+    flush_expired_token.apply_async(args=[session.id], eta=expires_at)
+    return session
 
-def set_refresh_cookie(response, refresh):
-    refresh_lifetime = api_settings.REFRESH_TOKEN_LIFETIME.total_seconds()
 
+from datetime import datetime
+from datetime import timezone as dt_timezone
+
+
+def set_refresh_cookie(response, refresh: RefreshToken):
+    lifetime_seconds = refresh["exp"] - int(
+        datetime.now(tz=dt_timezone.utc).timestamp()
+    )
     response.set_cookie(
         "refresh_token",
         str(refresh),
         httponly=True,
         secure=False,
         samesite="Lax",
-        max_age=int(refresh_lifetime),
+        max_age=lifetime_seconds,
         path="/",
     )
     return response
@@ -61,37 +100,47 @@ def set_refresh_cookie(response, refresh):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def refresh_token(request):
-    refresh_token_str = request.COOKIES.get("refresh_token")
-    if not refresh_token_str:
+    token_str = request.COOKIES.get("refresh_token")
+    if not token_str:
         return Response({"error": "No refresh token"}, status=401)
 
     try:
-        refresh = RefreshToken(refresh_token_str)
-
-        session = ActiveSession.objects.filter(jti=str(refresh["jti"])).first()
-
+        old_refresh = RefreshToken(token_str)
+        session = ActiveSession.objects.filter(jti=str(old_refresh["jti"])).first()
         if not session or not session.is_active():
             return Response({"error": "Session revoked"}, status=401)
 
-        access = str(refresh.access_token)
+        new_refresh = create_refresh_token_for_user(session.user)
+        new_refresh.set_jti()
 
-        return Response({"access": access})
+        remember_session(
+            session.user, new_refresh, request, old_jti=str(old_refresh["jti"])
+        )
+        response = Response({"access": str(new_refresh.access_token)})
+        return set_refresh_cookie(response, new_refresh)
 
     except TokenError:
-        return Response({"error": "Invalid refresh"}, status=401)
+        return Response({"error": "Invalid refresh token"}, status=401)
+
+
+def create_refresh_token_for_user(user):
+    lifetime_days = getattr(user, "preferred_session_lifetime_days", 7)
+
+    token = RefreshToken.for_user(user)
+    token.set_exp(from_time=timezone.now(), lifetime=timedelta(days=lifetime_days))
+    return token
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def api_login(request):
-    username = request.data.get("username")
-    password = request.data.get("password")
-
-    user = authenticate(username=username, password=password)
+    user = authenticate(
+        username=request.data.get("username"), password=request.data.get("password")
+    )
     if not user:
         return Response({"error": "Invalid credentials"}, status=400)
 
-    refresh = RefreshToken.for_user(user)
+    refresh = create_refresh_token_for_user(user)
     access = str(refresh.access_token)
 
     remember_session(user, refresh, request)
@@ -99,10 +148,9 @@ def api_login(request):
     response = Response(
         {
             "access": access,
-            "user": UserSerializer(user).data,
+            "user": UserSerializer(user, context={"request": request}).data,
         }
     )
-
     return set_refresh_cookie(response, refresh)
 
 

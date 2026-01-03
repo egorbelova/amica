@@ -1,15 +1,18 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import DisplayPhoto, DisplayVideo
-from .serializers.serializers import DisplayMediaCreateSerializer, DisplayMediaSerializer
-from rest_framework.permissions import IsAuthenticated
-
+from .serializers.serializers import (DisplayMediaCreateSerializer,
+                                      DisplayMediaSerializer)
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 class DisplayMediaViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
+
     def get_object_instance(self):
         content_type = self.request.query_params.get("content_type")
         object_id = self.request.query_params.get("object_id")
@@ -33,7 +36,32 @@ class DisplayMediaViewSet(viewsets.ViewSet):
             media, many=True, context={"request": request}
         )
         return Response(serializer.data)
-
+    
+    
+    
+    def notify_avatar_updated(self, profile, request=None):
+        primary_media = profile.profile_media.filter(is_primary=True).first()
+        if not primary_media:
+            return
+    
+        serializer = DisplayMediaSerializer(primary_media, context={"request": request})
+        data = serializer.data
+        channel_layer = get_channel_layer()
+        user_id = profile.user.id
+    
+        async_to_sync(channel_layer.group_send)(
+            f"user_{user_id}",
+            {
+                "type": "file_uploaded",
+                "data": {
+                    "object_id": user_id,
+                    "content_type": "profile",
+                    "media": data,
+                },
+            },
+        )
+    
+    
     def create(self, request, *args, **kwargs):
         obj = self.get_object_instance()
         print(obj)
@@ -46,6 +74,9 @@ class DisplayMediaViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         media = serializer.save()
         output_serializer = DisplayMediaSerializer(media, context={"request": request})
+
+        if obj.user == request.user:
+            self.notify_avatar_updated(obj, request=request)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
