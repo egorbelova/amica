@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def cleanup_expired_blacklisted_tokens():
     now = timezone.now()
     expired_tokens = BlacklistedToken.objects.filter(token__expires_at__lte=now)

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 500
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def purge_soft_deleted_messages():
     """
     Physically remove messages marked deleted-for-all. Batched to limit transaction size.

@@ -21,19 +21,19 @@ class ImageProcessingMixin(models.Model):
         if not image_field:
             return
 
-        img = Image.open(image_field)
-        img = ImageOps.exif_transpose(img)
-        self.width, self.height = img.size
-        self.dominant_color = self._get_average_color(img)
+        with Image.open(image_field) as raw:
+            img = ImageOps.exif_transpose(raw)
+            self.width, self.height = img.size
+            self.dominant_color = self._get_average_color(img)
 
-        for field_name, (size, quality) in self.THUMBNAILS.items():
-            self._generate_thumbnail(
-                img,
-                image_field.name,
-                field_name,
-                size,
-                quality,
-            )
+            for field_name, (size, quality) in self.THUMBNAILS.items():
+                self._generate_thumbnail(
+                    img,
+                    image_field.name,
+                    field_name,
+                    size,
+                    quality,
+                )
 
     def _get_average_color(self, img):
         r, g, b = img.resize((1, 1)).getpixel((0, 0))[:3]

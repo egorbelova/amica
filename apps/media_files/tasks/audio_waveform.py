@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def process_audio_task(audiofile_id, message_id, user_id):
     from apps.media_files.models import AudioFile
     from apps.Site.models import Message
@@ -41,7 +41,7 @@ def populate_audiofile_metadata(audiofile):
 
         audio = AudioSegment.from_file(tmp.name)
         duration = round(len(audio) / 1000, 2)
-        waveform = generate_waveform(tmp.name, samples=60)
+        waveform = generate_waveform(audio, samples=60)
 
         mutagen_audio = MutagenFile(tmp.name)
         cover_data = None
@@ -69,7 +69,7 @@ def populate_audiofile_metadata(audiofile):
         return {"duration": duration, "waveform": waveform}
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def process_image_task(imagefile_id, message_id, user_id):
     from apps.media_files.models import ImageFile
     from apps.Site.models import Message
@@ -98,7 +98,7 @@ def process_image_task(imagefile_id, message_id, user_id):
         return None
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def process_video_task(videofile_id, message_id, user_id):
     from apps.media_files.models import VideoFile
     from apps.Site.models import Message

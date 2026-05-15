@@ -29,8 +29,6 @@ from webauthn.helpers.structs import (
     PublicKeyCredentialDescriptor,
 )
 
-from apps.Site.tasks.flush_expired_tokens import flush_expired_token
-
 from .backup_codes import (
     issue_initial_backup_codes_if_needed,
     regenerate_backup_codes,
@@ -161,15 +159,6 @@ def remember_session(user, refresh, request, old_jti=None, response=None):
         expires_at=expires_at,
     )
 
-    try:
-        flush_expired_token.apply_async(args=[session.id], eta=expires_at)
-    except Exception as e:
-        logger.warning(
-            "Could not schedule flush_expired_token for session %s: %s",
-            session.id,
-            e,
-        )
-
     return session
 
 
@@ -218,14 +207,6 @@ def remember_session_from_scope(scope, user, refresh, old_jti=None):
         binding_hash=binding_from_scope(scope),
         expires_at=expires_at,
     )
-    try:
-        flush_expired_token.apply_async(args=[session.id], eta=expires_at)
-    except Exception as e:
-        logger.warning(
-            "Could not schedule flush_expired_token for session %s: %s",
-            session.id,
-            e,
-        )
     return session
 
 

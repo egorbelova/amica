@@ -5,8 +5,6 @@ from channels.layers import get_channel_layer
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.Site.tasks.flush_expired_tokens import flush_expired_token
-
 from ..models import ActiveSession
 
 
@@ -77,8 +75,6 @@ def update_user_session_lifetime(user, days, current_refresh_token=None):
 
         session.expires_at = expires_at
         session.save()
-
-        flush_expired_token.apply_async(args=[session.id], eta=expires_at)
 
         expires_at_by_jti[session.jti] = session.expires_at.isoformat()
 
