@@ -2,19 +2,11 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework import serializers
 
+from ..filename_utils import normalize_original_filename
 from ..models import *
 
 
 def absolute_media_url(relative_or_absolute, request=None):
-    """
-    Browser-loadable URL for protected media.
-
-    WebSocket / background senders pass serializers without ``request``; ``reverse()`` alone
-    yields a path like ``/api/protected-file/...`` which is wrong inside ``<video src>``
-    (same-origin as the SPA). Prefer ``request.build_absolute_uri`` when present, else
-    ``SITE_SCHEME`` + ``SITE_DOMAIN`` (must be reachable from the client, not an internal
-    Docker hostname).
-    """
     if relative_or_absolute is None:
         return None
     s = str(relative_or_absolute).strip()
@@ -212,6 +204,12 @@ class FileSerializer(serializers.ModelSerializer):
             url = reverse("protected-file-versioned", args=[obj.id, v])
             return absolute_media_url(url, request)
         return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("original_name"):
+            data["original_name"] = normalize_original_filename(data["original_name"])
+        return data
 
 
 class ImageFileSerializer(FileSerializer):

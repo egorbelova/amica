@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile, File
 from django.core.validators import FileExtensionValidator
 from django.db import models, transaction
 from django.utils import timezone
+from apps.media_files.filename_utils import normalize_original_filename
 from apps.media_files.mixins import ImageProcessingMixin
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFill
@@ -208,7 +209,9 @@ class File(PolymorphicModel):
     def save(self, *args, **kwargs):
         if self.file:
             if not self.original_name:
-                self.original_name = os.path.basename(self.file.name)
+                self.original_name = normalize_original_filename(
+                    os.path.basename(self.file.name)
+                )
             if not self.name:
                 self.name = os.path.basename(self.file.name)
             if not self.extension:

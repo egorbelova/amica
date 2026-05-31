@@ -2043,6 +2043,7 @@ class AppConsumer(BaseConsumer):
             WS_SERVER_CHUNK_SIZE,
             chunk_init_service,
         )
+        from apps.media_files.filename_utils import normalize_original_filename
 
         request_id = data.get("request_id")
         d = data.get("data") or {}
@@ -2059,7 +2060,7 @@ class AppConsumer(BaseConsumer):
             )
             return
 
-        filename = (d.get("filename") or "file").replace("\\", "/").split("/")[-1]
+        filename = normalize_original_filename(d.get("filename") or "file")
         mime_type = (d.get("mime_type") or "").strip().lower()
         media_kind = (d.get("media_kind") or "").strip().lower()
         try:

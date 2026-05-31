@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.media_files.filename_utils import normalize_original_filename
 from apps.media_files.models.models import DisplayPhoto, DisplayVideo, File
 
 from ..accounts.forms import *
@@ -430,6 +431,7 @@ class MessageViewSet(viewsets.ViewSet):
                         filename = protected_storage.save(
                             uploaded_file.name, uploaded_file
                         )
+                        display_name = normalize_original_filename(uploaded_file.name)
 
                         mime_type, _ = guess_type(uploaded_file.name)
                         resolved_mime = (mime_type or "").strip().lower()
@@ -469,6 +471,7 @@ class MessageViewSet(viewsets.ViewSet):
 
                             needs_processing = True
                             new_file = ImageFile(file=filename)
+                            new_file.original_name = display_name
                             # Populate image metadata/thumbnails immediately so prod
                             # does not depend on Celery timing/worker file access.
                             new_file.save(process_media=True)
@@ -479,6 +482,7 @@ class MessageViewSet(viewsets.ViewSet):
 
                             needs_processing = True
                             new_file = VideoFile(file=filename)
+                            new_file.original_name = display_name
                             # Populate width/height immediately so prod does not
                             # depend on Celery timing/worker file access.
                             new_file.save(process_media=True)
@@ -488,12 +492,18 @@ class MessageViewSet(viewsets.ViewSet):
                                 populate_audiofile_metadata,
                             )
                             needs_processing = True
-                            new_file = AudioFile.objects.create(file=filename)
+                            new_file = AudioFile.objects.create(
+                                file=filename,
+                                original_name=display_name,
+                            )
                             # Populate audio metadata/cover immediately so prod
                             # does not depend on Celery timing/worker file access.
                             populate_audiofile_metadata(new_file)
                         else:
-                            new_file = File.objects.create(file=filename)
+                            new_file = File.objects.create(
+                                file=filename,
+                                original_name=display_name,
+                            )
                         new_message.file.add(new_file)
                         if is_video:
                             process_video_task.delay(

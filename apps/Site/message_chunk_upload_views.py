@@ -16,6 +16,7 @@ from typing import Optional, Tuple
 from django.conf import settings
 from django.core.files import File as DjangoFile
 from django.core.files.storage import FileSystemStorage
+from apps.media_files.filename_utils import normalize_original_filename
 from django.http import JsonResponse
 from mimetypes import guess_type
 from rest_framework.permissions import IsAuthenticated
@@ -158,7 +159,7 @@ class MessageChunkInitView(APIView):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
         chat_id = int(data.get("chat_id") or 0)
-        filename = (data.get("filename") or "file").replace("\\", "/").split("/")[-1]
+        filename = normalize_original_filename(data.get("filename") or "file")
         mime_type = (data.get("mime_type") or "").strip().lower()
         media_kind = (data.get("media_kind") or "").strip().lower()
         total_size = int(data.get("total_size") or 0)
@@ -362,12 +363,14 @@ def _attach_storage_file_to_message(
         ".wma",
     }
     needs_processing = False
+    display_name = normalize_original_filename(original_name)
 
     if is_image:
         from apps.media_files.tasks.audio_waveform import process_image_task
 
         needs_processing = True
         new_file = ImageFile(file=filename)
+        new_file.original_name = display_name
         # Fast-path complete: defer metadata + thumbnails to background.
         new_file.save(process_media=False)
     elif is_video:
@@ -375,6 +378,7 @@ def _attach_storage_file_to_message(
 
         needs_processing = True
         new_file = VideoFile(file=filename)
+        new_file.original_name = display_name
         if width is not None and height is not None:
             new_file.width = width
             new_file.height = height
@@ -385,9 +389,15 @@ def _attach_storage_file_to_message(
         from apps.media_files.tasks.audio_waveform import process_audio_task
 
         needs_processing = True
-        new_file = AudioFile.objects.create(file=filename)
+        new_file = AudioFile.objects.create(
+            file=filename,
+            original_name=display_name,
+        )
     else:
-        new_file = File.objects.create(file=filename)
+        new_file = File.objects.create(
+            file=filename,
+            original_name=display_name,
+        )
 
     new_message.file.add(new_file)
     # print(
