@@ -1,5 +1,3 @@
-"""Trusted-device recovery OTP + signup email verification OTP."""
-
 from __future__ import annotations
 
 import hashlib

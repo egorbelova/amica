@@ -79,6 +79,8 @@ click-repl==0.3.0
     # via celery
 constantly==23.10.4
     # via twisted
+cron-descriptor==1.4.5
+    # via django-celery-beat
 cryptography==46.0.3
     # via
     #   autobahn
@@ -105,7 +107,7 @@ django==6.0.1
     #   djangorestframework-simplejwt
 django-appconf==1.2.0
     # via django-imagekit
-django-celery-beat==2.1.0
+django-celery-beat==2.9.0
     # via -r requirements.in
 django-celery-results==2.6.0
     # via -r requirements.in
@@ -113,7 +115,7 @@ django-cors-headers==4.9.0
     # via -r requirements.in
 django-csp==4.0
     # via -r requirements.in
-django-environ==0.13.0
+django-environ==0.14.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
@@ -125,7 +127,7 @@ django-silk==5.4.3
     # via -r requirements.in
 django-sslserver==0.22
     # via -r requirements.in
-django-timezone-field==4.2.3
+django-timezone-field==7.2.2
     # via django-celery-beat
 djangorestframework==3.16.1
     # via
@@ -221,9 +223,7 @@ python-dateutil==2.9.0.post0
     # via celery
 pytokens==0.3.0
     # via black
-pytz==2025.2
-    # via django-timezone-field
-redis==7.1.0
+redis==7.4.1
     # via
     #   -r requirements.in
     #   channels-redis
@@ -246,7 +246,9 @@ txaio==25.12.2
 typing-extensions==4.15.0
     # via twisted
 tzdata==2025.3
-    # via kombu
+    # via
+    #   django-celery-beat
+    #   kombu
 tzlocal==5.3.1
     # via celery
 ujson==5.11.0

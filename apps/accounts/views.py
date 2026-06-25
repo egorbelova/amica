@@ -163,7 +163,6 @@ def remember_session(user, refresh, request, old_jti=None, response=None):
 
 
 def _get_scope_headers(scope):
-    """Return dict of lowercased header names to string values."""
     out = {}
     for k, v in scope.get("headers", []):
         if isinstance(k, bytes):
@@ -175,7 +174,6 @@ def _get_scope_headers(scope):
 
 
 def remember_session_from_scope(scope, user, refresh, old_jti=None):
-    """Create ActiveSession for WS login/signup. Uses scope headers for IP/user_agent."""
     refresh_jti = str(refresh["jti"])
     lifetime_days = getattr(user, "preferred_session_lifetime_days", 7)
     if (
@@ -280,12 +278,10 @@ def create_refresh_token_for_user(user):
 
 
 def get_new_access_token_for_user(user):
-    """Return a new access token string for the user (e.g. for WS refresh without rotation)."""
     return str(create_refresh_token_for_user(user).access_token)
 
 
 def get_access_token_for_session(session_jti, user, binding_hash=None):
-    """Return an access token string for the existing session (same jti). Used for WS connect with refresh cookie."""
     refresh = create_refresh_token_for_user(user)
     refresh.access_token["jti"] = session_jti
     if binding_hash:
@@ -318,12 +314,6 @@ def _gated_login_response(request, user):
 
 
 def _attach_initial_backup_codes_if_issued(user, response: Response) -> None:
-    """Issue backup codes only when TOTP is the guard for the account and none exist yet.
-
-    Kept for backward compatibility with users who enabled TOTP before backup codes
-    were wired into the setup-confirm response. New enrollments receive codes
-    directly from ``totp_setup_confirm`` instead of on the first login.
-    """
     if not user.totp_enabled:
         return
     codes = issue_initial_backup_codes_if_needed(user)
@@ -332,12 +322,6 @@ def _attach_initial_backup_codes_if_issued(user, response: Response) -> None:
 
 
 def _totp_http_gate(request, user):
-    """When TOTP is enabled, require totp_code OR a one-time backup_code in JSON.
-
-    Backup code is the account-recovery fallback for a lost authenticator; on success
-    the code is consumed atomically. It does NOT bypass the device-confirmation step
-    that runs afterwards — only the possession factor.
-    """
     if not user.totp_enabled:
         return None
     code = (request.data.get("totp_code") or "").strip()
@@ -371,7 +355,6 @@ def _totp_http_gate(request, user):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def client_binding_bootstrap(request):
-    """Ensure binding cookie exists. Do not return the id in JSON (XSS-safe)."""
     response = Response({"ok": True})
     attach_client_binding_cookie_if_needed(request, response)
     return response
@@ -431,10 +414,6 @@ def verify_email_otp(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def device_login_submit_code(request):
-    """
-    New (untrusted) device submits the OTP shown on the trusted device.
-    Request binding must match the challenge's new_binding_hash.
-    """
     challenge_id = request.data.get("challenge_id")
     code = request.data.get("code")
     if not challenge_id:
@@ -498,9 +477,6 @@ def device_login_submit_code(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def device_login_resend_notify(request):
-    """
-    Same client as the pending challenge: re-push WebSocket + email to trusted devices.
-    """
     challenge_id = request.data.get("challenge_id")
     if not challenge_id:
         return Response(
@@ -546,9 +522,6 @@ def device_login_resend_notify(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def device_login_trusted_decision(request):
-    """
-    Authenticated session can allow (returns OTP) or deny new-device login challenge.
-    """
     user = request.user
 
     challenge_id = request.data.get("challenge_id")
@@ -762,7 +735,6 @@ def google_login(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def backup_codes_status(request):
-    """Recovery codes exist only while TOTP is enabled; rows are cleared on TOTP disable."""
     totp_on = bool(request.user.totp_enabled)
     n = (
         AccountBackupCode.objects.filter(

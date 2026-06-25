@@ -20,7 +20,7 @@ redis==7.*
 
 # Background tasks
 celery==5.6.*
-django-celery-beat
+django-celery-beat==2.9.0
 django-celery-results==2.6.0
 
 # Media processing
@@ -33,7 +33,7 @@ audioop-lts==0.2.2
 mutagen==1.47.0
 
 # Development tools
-django-environ==0.13.0
+django-environ==0.14.*
 django-extensions==4.1
 django-cors-headers==4.9.0
 django-sslserver==0.22
